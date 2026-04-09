@@ -402,18 +402,19 @@
     font-weight: 500;
   }
 
-  /* Steps guide */
-  .steps-card {
+  /* Novo Card Motivacional */
+  .motivational-card {
     background: linear-gradient(135deg, var(--p700) 0%, var(--p600) 50%, var(--p500) 100%);
     border-radius: var(--radius);
-    padding: 2rem;
+    padding: 2.5rem 2rem;
     color: #fff;
     box-shadow: var(--shadow-lg);
     position: relative;
     overflow: hidden;
     margin-top: 1.5rem;
+    text-align: center;
   }
-  .steps-card::before {
+  .motivational-card::before {
     content: '';
     position: absolute;
     top: -60px; right: -60px;
@@ -421,7 +422,7 @@
     background: rgba(255,255,255,0.08);
     border-radius: 50%;
   }
-  .steps-card::after {
+  .motivational-card::after {
     content: '';
     position: absolute;
     bottom: -40px; left: 60px;
@@ -429,58 +430,23 @@
     background: rgba(255,255,255,0.05);
     border-radius: 50%;
   }
-  .steps-card h2 {
+  .motivational-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    position: relative; 
+    z-index: 1;
+    display: inline-block;
+    animation: float 4s ease-in-out infinite;
+  }
+  .motivational-text {
     font-family: var(--font-display);
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 1.25rem;
-    opacity: 0.95;
-    position: relative; z-index: 1;
-  }
-  .step-list { position: relative; z-index: 1; }
-  .step {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 1rem;
-    align-items: flex-start;
-  }
-  .step:last-child { margin-bottom: 0; }
-  .step-num {
-    width: 28px; height: 28px;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    flex-shrink: 0;
-    backdrop-filter: blur(4px);
-  }
-  .step-content { padding-top: 4px; }
-  .step-content strong { display: block; font-size: 13.5px; font-weight: 500; margin-bottom: 2px; }
-  .step-content span { font-size: 12.5px; opacity: 0.8; line-height: 1.5; }
-
-  .deploy-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.4);
-    color: #fff;
-    padding: 9px 20px;
-    border-radius: var(--radius-full);
-    font-size: 13px;
+    font-size: 1.3rem;
+    line-height: 1.5;
     font-weight: 500;
-    text-decoration: none;
-    margin-top: 1.25rem;
-    transition: background 0.2s, transform 0.2s;
-    cursor: pointer;
-    backdrop-filter: blur(4px);
-    position: relative; z-index: 1;
-  }
-  .deploy-link:hover {
-    background: rgba(255,255,255,0.3);
-    transform: translateY(-2px);
+    position: relative; 
+    z-index: 1;
+    letter-spacing: 0.02em;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
   /* Spinner */
@@ -602,20 +568,9 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
     </div>
   </div>
 
-  <div class="steps-card" id="deploy-guide">
-    <h2>🚀 Acesse o seu Painel do Vercel</h2>
-    <div class="step-list">
-      <div class="step">
-        <div class="step-num">✓</div>
-        <div class="step-content">
-          <strong>Seu projeto já está estruturado</strong>
-          <span>Como você já conectou no GitHub e o projeto subiu no Vercel, o link já está funcionando!</span>
-        </div>
-      </div>
-    </div>
-    <button class="deploy-link" id="btn-download-project">
-      Ir para o Painel do Vercel
-    </button>
+  <div class="motivational-card">
+    <div class="motivational-icon">✨</div>
+    <p class="motivational-text" id="daily-quote"></p>
   </div>
 
   <footer>
@@ -624,6 +579,34 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
 </div>
 
 <script>
+// Lista de frases para a Sabrina (Adicione quantas quiser aqui!)
+const motivationalQuotes = [
+  "Sabrina, nunca desista dos seus sonhos... Você vai conseguir.",
+  "Sabrina, você é capaz. A Crissá vai voar alto...",
+  "Sabrina, cada pequeno passo hoje é um grande salto para a Crissá amanhã.",
+  "Sabrina, o sucesso da sua marca é o reflexo da sua dedicação diária.",
+  "Sabrina, grandes conquistas exigem tempo e paciência. Siga em frente!",
+  "Sabrina, o impossível é apenas uma palavra. Acredite na sua visão de negócio.",
+  "Sabrina, transforme desafios em degraus. A Crissá tem um futuro brilhante.",
+  "Sabrina, a sua paixão é o motor da Crissá. Inspire-se todos os dias!",
+  "Sabrina, foque no progresso, não na perfeição. Você está no caminho certo.",
+  "Sabrina, o mundo precisa do brilho e da dedicação que só a Crissá tem a oferecer!"
+];
+
+// Lógica para girar a frase por dia
+function setDailyQuote() {
+  const today = new Date();
+  // Divide os milissegundos por 24 horas para pegar o "número do dia" e achar o resto (índice)
+  const dayIndex = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+  const quoteIndex = dayIndex % motivationalQuotes.length;
+  
+  document.getElementById('daily-quote').textContent = motivationalQuotes[quoteIndex];
+}
+
+// Inicia a frase assim que a página carrega
+setDailyQuote();
+
+
 // Puxando a biblioteca para criar o PDF de volta
 const { jsPDF } = window.jspdf;
 
@@ -862,10 +845,6 @@ function renderPreviews(totalLabels) {
      previewWrap.appendChild(info);
   }
 }
-
-document.getElementById('btn-download-project').addEventListener('click', () => {
-  window.open('https://vercel.com/dashboard', '_blank');
-});
 </script>
 </body>
 </html>
