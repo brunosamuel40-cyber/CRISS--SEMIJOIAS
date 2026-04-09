@@ -530,7 +530,6 @@
     <p class="subtitle">Etiquetas Shopee · Impressora Térmica · Sem mensalidade</p>
   </header>
 
-  <!-- ZPL Input -->
   <div class="card">
     <div class="card-title">
       <span class="icon">📋</span>
@@ -554,7 +553,6 @@
 Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página no PDF."></textarea>
   </div>
 
-  <!-- Config -->
   <div class="card">
     <div class="card-title">
       <span class="icon">⚙️</span>
@@ -596,10 +594,8 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
     </div>
   </div>
 
-  <!-- Status -->
   <div id="status-area"></div>
 
-  <!-- Preview -->
   <div class="card">
     <div class="card-title">
       <span class="icon">🖼</span>
@@ -613,48 +609,19 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
     </div>
   </div>
 
-  <!-- Deploy Guide -->
   <div class="steps-card" id="deploy-guide">
-    <h2>🚀 Como colocar no ar (Vercel) — passo a passo</h2>
+    <h2>🚀 Acesse o seu Painel do Vercel</h2>
     <div class="step-list">
       <div class="step">
-        <div class="step-num">1</div>
+        <div class="step-num">✓</div>
         <div class="step-content">
-          <strong>Baixe o projeto completo</strong>
-          <span>Clique no botão abaixo para baixar o ZIP com todos os arquivos do projeto.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <strong>Crie uma conta grátis no Vercel</strong>
-          <span>Acesse <code>vercel.com</code> e entre com sua conta do GitHub (grátis).</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <strong>Suba o projeto para o GitHub</strong>
-          <span>Crie um repositório novo no GitHub e envie a pasta do projeto. Pode usar o <code>GitHub Desktop</code> (mais fácil).</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <strong>Importe no Vercel</strong>
-          <span>No Vercel, clique em <code>Add New → Project</code>, selecione seu repositório e clique em <code>Deploy</code>. Pronto!</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-content">
-          <strong>Seu site fica no ar em &lt;2 minutos</strong>
-          <span>Você receberá um link como <code>crissa-zpl.vercel.app</code> que funciona de qualquer lugar.</span>
+          <strong>Seu projeto já está estruturado</strong>
+          <span>Como você já conectou no GitHub e o projeto subiu no Vercel, o link já está funcionando!</span>
         </div>
       </div>
     </div>
     <button class="deploy-link" id="btn-download-project">
-      ⬇ Baixar projeto ZIP
+      Ir para o Painel do Vercel
     </button>
   </div>
 
@@ -698,11 +665,6 @@ zplInput.addEventListener('input', updateCount);
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
-  new FileReader().onload = ev => {
-    zplInput.value = ev.target.result;
-    updateCount();
-    showStatus(`"${file.name}" carregado com sucesso!`);
-  };
   const r = new FileReader();
   r.onload = ev => { zplInput.value = ev.target.result; updateCount(); showStatus(`"${file.name}" carregado!`); };
   r.readAsText(file, 'utf-8');
@@ -772,11 +734,17 @@ btnRender.addEventListener('click', async () => {
   try {
     for (const label of currentLabels) {
       const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/0/`;
+      
+      // A CORREÇÃO PRINCIPAL ACONTECE AQUI:
+      // Removemos o 'Content-Type' para que o fetch envie como texto puro natural.
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Accept': 'image/png', 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 
+            'Accept': 'image/png'
+        },
         body: label,
       });
+      
       if (!resp.ok) throw new Error(`Erro ${resp.status} na Labelary API`);
       const blob = await resp.blob();
       const dataUrl = await blobToDataUrl(blob);
@@ -842,8 +810,7 @@ btnPdf.addEventListener('click', () => {
 
 // Download project as a guide
 document.getElementById('btn-download-project').addEventListener('click', () => {
-  showStatus('Baixe o ZIP via botão acima no chat do Claude 👆', 'ok');
-  window.open('https://vercel.com/new', '_blank');
+  window.open('https://vercel.com/dashboard', '_blank');
 });
 </script>
 </body>
