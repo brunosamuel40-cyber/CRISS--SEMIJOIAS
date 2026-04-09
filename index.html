@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRISSÁ SEMIJÓIAS - Conversor ZPL → PDF</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --p50:  #f5f0ff;
@@ -459,13 +458,6 @@
   .step-content { padding-top: 4px; }
   .step-content strong { display: block; font-size: 13.5px; font-weight: 500; margin-bottom: 2px; }
   .step-content span { font-size: 12.5px; opacity: 0.8; line-height: 1.5; }
-  .step-content code {
-    background: rgba(255,255,255,0.18);
-    padding: 1px 7px;
-    border-radius: 5px;
-    font-family: monospace;
-    font-size: 11.5px;
-  }
 
   .deploy-link {
     display: inline-flex;
@@ -589,7 +581,7 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
         ✦ Gerar prévia
       </button>
       <button class="btn btn-success" id="btn-pdf" disabled>
-        ⬇ Baixar PDF
+        ⬇ Baixar PDF Completo
       </button>
     </div>
   </div>
@@ -631,8 +623,6 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
 </div>
 
 <script>
-const { jsPDF } = window.jspdf;
-
 const zplInput = document.getElementById('zpl-input');
 const previewWrap = document.getElementById('preview-wrap');
 const btnRender = document.getElementById('btn-render');
@@ -682,7 +672,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   previewImages = [];
 });
 
-// A MÁGICA ACONTECE AQUI:
+// MOTOR DE PRÉVIA: Só carrega as primeiras para não travar
 btnRender.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) { showStatus('Cole ou carregue um ZPL primeiro.', 'err'); return; }
@@ -690,7 +680,7 @@ btnRender.addEventListener('click', async () => {
   const numLabels = updateCount();
   if (numLabels === 0) { showStatus('Nenhum bloco ^XA encontrado.', 'err'); return; }
 
-  showStatus(`Processando arquivo com a Shopee...`, 'loading');
+  showStatus(`Gerando prévia inteligente...`, 'loading');
   btnRender.disabled = true;
 
   const paperSize = document.getElementById('paper-size').value;
@@ -698,19 +688,21 @@ btnRender.addEventListener('click', async () => {
   const dpi = document.getElementById('dpi').value;
 
   previewImages = [];
+  
+  // Limita a 3 imagens na prévia para não bloquear a API
+  const maxPreviews = Math.min(numLabels, 3);
 
   try {
-    for (let i = 0; i < numLabels; i++) {
+    for (let i = 0; i < maxPreviews; i++) {
       const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/${i}/`;
       
-      // Empacotando o ZPL como um arquivo "invisível" para proteger o código da Shopee
       const formData = new FormData();
       formData.append('file', new Blob([zpl], { type: 'application/octet-stream' }), 'etiqueta.zpl');
 
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Accept': 'image/png' },
-        body: formData, // Enviamos o pacote protegido
+        body: formData,
       });
       
       if (!resp.ok) continue; 
@@ -720,15 +712,64 @@ btnRender.addEventListener('click', async () => {
       previewImages.push(dataUrl);
     }
 
-    if (previewImages.length === 0) throw new Error("A API não gerou imagens. Verifique o código da etiqueta.");
+    if (previewImages.length === 0) throw new Error("Falha ao gerar imagens. Código inválido.");
 
-    renderPreviews();
-    showStatus(`✓ ${previewImages.length} etiqueta(s) gerada(s) com sucesso!`);
+    renderPreviews(numLabels);
+    showStatus(`✓ Prévia pronta! Clique em Baixar PDF para pegar o arquivo completo.`);
     btnPdf.disabled = false;
   } catch (err) {
     showStatus('Erro: ' + err.message, 'err');
   } finally {
     btnRender.disabled = false;
+  }
+});
+
+// MOTOR DE PDF: Pede o PDF oficial completo da Labelary de uma vez só
+btnPdf.addEventListener('click', async () => {
+  const zpl = zplInput.value.trim();
+  if (!zpl) return;
+
+  const numLabels = updateCount();
+  showStatus(`Gerando PDF final com ${numLabels} página(s)...`, 'loading');
+  btnPdf.disabled = true;
+
+  const paperSize = document.getElementById('paper-size').value;
+  const [wInch, hInch] = paperSize.split('x').map(Number);
+  const dpi = document.getElementById('dpi').value;
+
+  try {
+    // Ao NÃO colocar o número da página no final da URL, a API entende que queremos TODAS juntas!
+    const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/`;
+    
+    const formData = new FormData();
+    formData.append('file', new Blob([zpl], { type: 'application/octet-stream' }), 'etiquetas.zpl');
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Accept': 'application/pdf' }, // Isso muda tudo, ele gera o PDF nativo
+      body: formData,
+    });
+    
+    if (!resp.ok) throw new Error("A API não conseguiu gerar o PDF.");
+    
+    const blob = await resp.blob();
+    
+    // Força o download do PDF
+    const urlDownload = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = urlDownload;
+    const date = new Date().toISOString().slice(0, 10);
+    a.download = `crissa-etiquetas-${date}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(urlDownload);
+
+    showStatus(`✓ PDF completo baixado com sucesso!`);
+  } catch (err) {
+    showStatus('Erro: ' + err.message, 'err');
+  } finally {
+    btnPdf.disabled = false;
   }
 });
 
@@ -741,9 +782,10 @@ function blobToDataUrl(blob) {
   });
 }
 
-function renderPreviews() {
+function renderPreviews(totalLabels) {
   previewWrap.className = 'preview-wrap has-content';
   previewWrap.innerHTML = '';
+  
   previewImages.forEach((src, i) => {
     const card = document.createElement('div');
     card.className = 'thumb-card';
@@ -757,27 +799,19 @@ function renderPreviews() {
     card.appendChild(lbl);
     previewWrap.appendChild(card);
   });
+
+  // Mostra um aviso simpático se houver mais etiquetas escondidas
+  if (totalLabels > previewImages.length) {
+     const info = document.createElement('div');
+     info.style.width = "100%";
+     info.style.textAlign = "center";
+     info.style.marginTop = "15px";
+     info.style.color = "var(--p600)";
+     info.style.fontSize = "13.5px";
+     info.innerHTML = `Mostrando as primeiras ${previewImages.length} etiquetas na prévia.<br><strong>Não se preocupe, ao baixar, o PDF terá todas as ${totalLabels} páginas!</strong>`;
+     previewWrap.appendChild(info);
+  }
 }
-
-btnPdf.addEventListener('click', () => {
-  if (!previewImages.length) return;
-
-  const paperSize = document.getElementById('paper-size').value;
-  const [wInch, hInch] = paperSize.split('x').map(Number);
-  const wMM = wInch * 25.4;
-  const hMM = hInch * 25.4;
-
-  const pdf = new jsPDF({ unit: 'mm', format: [wMM, hMM], orientation: 'p' });
-
-  previewImages.forEach((img, i) => {
-    if (i > 0) pdf.addPage([wMM, hMM], 'p');
-    pdf.addImage(img, 'PNG', 0, 0, wMM, hMM, '', 'FAST');
-  });
-
-  const date = new Date().toISOString().slice(0, 10);
-  pdf.save(`crissa-etiquetas-${date}.pdf`);
-  showStatus(`PDF baixado!`);
-});
 
 document.getElementById('btn-download-project').addEventListener('click', () => {
   window.open('https://vercel.com/dashboard', '_blank');
