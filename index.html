@@ -742,7 +742,7 @@ btnRender.addEventListener('click', async () => {
   }
 });
 
-// MOTOR DE DOWNLOAD: Processa as 52 fatias com sistema Anti-Bloqueio (pausa de 300ms)
+// MOTOR DE DOWNLOAD: Processa com sistema Anti-Bloqueio e Retentativas ("Teimosia")
 btnPdf.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) return;
@@ -764,38 +764,59 @@ btnPdf.addEventListener('click', async () => {
     let successCount = 0;
     
     for (let i = 0; i < total; i++) {
-      showStatus(`Processando página ${i + 1} de ${total}... (Isso pode levar um tempinho)`, 'loading');
+      showStatus(`Processando página ${i + 1} de ${total}... (Pode levar alguns segundos)`, 'loading');
       
       const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/0/`;
-      
-      const formData = new FormData();
-      formData.append('file', new Blob([chunks[i]], { type: 'application/octet-stream' }), `etiqueta_${i}.zpl`);
+      let imgGerada = false;
+      let tentativas = 0;
+      let dataUrl = null;
 
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Accept': 'image/png' },
-        body: formData,
-      });
+      // LOOP DE TEIMOSIA: Tenta até 3 vezes se o servidor der erro
+      while (tentativas < 3 && !imgGerada) {
+        try {
+          const formData = new FormData();
+          formData.append('file', new Blob([chunks[i]], { type: 'application/octet-stream' }), `etiqueta_${i}.zpl`);
+
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'image/png' },
+            body: formData,
+          });
+          
+          if (resp.ok) {
+            const blob = await resp.blob();
+            dataUrl = await blobToDataUrl(blob);
+            imgGerada = true; // Deu certo, sai do loop de teimosia
+          } else {
+            // A API recusou (provável limite de velocidade). Espera 1.5s e tenta de novo.
+            tentativas++;
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        } catch (err) {
+          // Erro de rede. Espera e tenta de novo.
+          tentativas++;
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      }
       
-      if (!resp.ok) continue; 
+      // Adiciona a página no PDF se conseguiu gerar
+      if (imgGerada && dataUrl) {
+        if (successCount > 0) pdf.addPage([wMM, hMM], 'p');
+        pdf.addImage(dataUrl, 'PNG', 0, 0, wMM, hMM, '', 'FAST');
+        successCount++;
+      } else {
+        console.warn(`Atenção: A etiqueta ${i + 1} falhou após 3 tentativas.`);
+      }
       
-      const blob = await resp.blob();
-      const dataUrl = await blobToDataUrl(blob);
-      
-      // Adiciona a página no PDF
-      if (successCount > 0) pdf.addPage([wMM, hMM], 'p');
-      pdf.addImage(dataUrl, 'PNG', 0, 0, wMM, hMM, '', 'FAST');
-      successCount++;
-      
-      // SISTEMA ANTI-BLOQUEIO: Pausa de 300ms para a Labelary não fechar nossa conexão
-      await new Promise(r => setTimeout(r, 300));
+      // Pausa padrão de 600ms entre as requisições para a API não bloquear
+      await new Promise(r => setTimeout(r, 600));
     }
 
-    if(successCount === 0) throw new Error("Nenhuma etiqueta pôde ser processada.");
+    if(successCount === 0) throw new Error("Nenhuma etiqueta pôde ser processada. Tente novamente mais tarde.");
 
     const date = new Date().toISOString().slice(0, 10);
     pdf.save(`crissa-etiquetas-${date}.pdf`);
-    showStatus(`✓ PDF com ${successCount} páginas baixado com sucesso!`);
+    showStatus(`✓ PDF finalizado! ${successCount} de ${total} etiquetas processadas.`);
   } catch (err) {
     showStatus('Erro: ' + err.message, 'err');
   } finally {
