@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRISSÁ SEMIJÓIAS · Conversor ZPL → PDF</title>
+<title>CRISSÁ SEMIJÓIAS - Conversor ZPL → PDF</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -524,7 +524,7 @@
   <header>
     <div class="logo-badge">
       <span class="logo-diamond">💎</span>
-      CRISSÁ · &amp; Semijoias
+      CRISSÁ · Semijoias
     </div>
     <h1>Conversor ZPL → PDF</h1>
     <p class="subtitle">Etiquetas Shopee · Impressora Térmica · Sem mensalidade</p>
@@ -626,7 +626,7 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
   </div>
 
   <footer>
-    Feito com 💜 para a <strong>CRISSÁ</strong> ·&amp; Semijoias
+    Feito com 💜 para a <strong>CRISSÁ</strong> · Semijoias
   </footer>
 </div>
 
@@ -642,7 +642,6 @@ const labelCount = document.getElementById('label-count');
 const statusArea = document.getElementById('status-area');
 
 let previewImages = [];
-let currentLabels = [];
 
 function showStatus(msg, type = 'ok') {
   const icons = { ok: '✓', err: '✕', loading: '' };
@@ -651,13 +650,12 @@ function showStatus(msg, type = 'ok') {
   if (type === 'ok') setTimeout(() => statusArea.innerHTML = '', 5000);
 }
 
-function splitLabels(zpl) {
-  return (zpl.match(/\^XA[\s\S]*?\^XZ/gi) || []).map(s => s.trim());
-}
-
+// Lógica de contagem corrigida (não joga mais código fora)
 function updateCount() {
-  const n = splitLabels(zplInput.value).length;
+  const matches = zplInput.value.match(/\^XA/gi);
+  const n = matches ? matches.length : 0;
   labelCount.textContent = n === 0 ? '0 etiquetas' : `${n} etiqueta${n > 1 ? 's' : ''} detectada${n > 1 ? 's' : ''}`;
+  return n;
 }
 
 zplInput.addEventListener('input', updateCount);
@@ -671,38 +669,9 @@ fileInput.addEventListener('change', e => {
 });
 
 document.getElementById('btn-sample').addEventListener('click', () => {
-  zplInput.value = `^XA
-^CF0,28
-^FO40,30^FDcrissá · & Semijoias^FS
-^FO40,75^GB630,2,2^FS
-^FO40,90^CF0,22^FDPedido: SP-20240001^FS
-^FO40,130^FDRemetente: CRISSÁ STORE^FS
-^FO40,165^FDRua das Flores, 123 - Americana/SP^FS
-^FO40,200^FDCEP: 13460-000^FS
-^FO40,240^GB630,2,2^FS
-^FO40,260^CF0,22^FDDestinatário: Maria Silva^FS
-^FO40,295^FDAv. Brasil, 500 - São Paulo/SP^FS
-^FO40,330^FDCEP: 01310-100^FS
-^BY2,2,90
-^FO40,370^BCN,,Y,N^FD123456789012^FS
-^XZ
-^XA
-^CF0,28
-^FO40,30^FDcrissá · Semijoias^FS
-^FO40,75^GB630,2,2^FS
-^FO40,90^CF0,22^FDPedido: SP-20240002^FS
-^FO40,130^FDRemetente: CRISSÁ STORE^FS
-^FO40,165^FDRua das Flores, 123 - Americana/SP^FS
-^FO40,200^FDCEP: 13460-000^FS
-^FO40,240^GB630,2,2^FS
-^FO40,260^CF0,22^FDDestinatário: João Santos^FS
-^FO40,295^FDAv. Paulista, 900 - São Paulo/SP^FS
-^FO40,330^FDCEP: 01310-200^FS
-^BY2,2,90
-^FO40,370^BCN,,Y,N^FD987654321098^FS
-^XZ`;
+  zplInput.value = `^XA\n^CF0,28\n^FO40,30^FDcrissá · Semijoias^FS\n^FO40,75^GB630,2,2^FS\n^FO40,90^CF0,22^FDPedido: SP-20240001^FS\n^FO40,130^FDRemetente: CRISSÁ STORE^FS\n^FO40,165^FDRua das Flores, 123 - Americana/SP^FS\n^FO40,200^FDCEP: 13460-000^FS\n^FO40,240^GB630,2,2^FS\n^FO40,260^CF0,22^FDDestinatário: Maria Silva^FS\n^FO40,295^FDAv. Brasil, 500 - São Paulo/SP^FS\n^FO40,330^FDCEP: 01310-100^FS\n^BY2,2,90\n^FO40,370^BCN,,Y,N^FD123456789012^FS\n^XZ`;
   updateCount();
-  showStatus('Exemplo com 2 etiquetas Shopee carregado!');
+  showStatus('Exemplo carregado!');
 });
 
 document.getElementById('btn-clear').addEventListener('click', () => {
@@ -714,15 +683,15 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   previewImages = [];
 });
 
-// Render via Labelary API
+// Novo motor de renderização (Envia o arquivo inteiro de uma vez)
 btnRender.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) { showStatus('Cole ou carregue um ZPL primeiro.', 'err'); return; }
 
-  currentLabels = splitLabels(zpl);
-  if (currentLabels.length === 0) { showStatus('Nenhum bloco ^XA...^XZ encontrado.', 'err'); return; }
+  const numLabels = updateCount();
+  if (numLabels === 0) { showStatus('Nenhum bloco ^XA encontrado.', 'err'); return; }
 
-  showStatus(`Convertendo ${currentLabels.length} etiqueta${currentLabels.length > 1 ? 's' : ''}...`, 'loading');
+  showStatus(`Processando ${numLabels} comando(s)...`, 'loading');
   btnRender.disabled = true;
 
   const paperSize = document.getElementById('paper-size').value;
@@ -732,30 +701,29 @@ btnRender.addEventListener('click', async () => {
   previewImages = [];
 
   try {
-    for (const label of currentLabels) {
-      const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/0/`;
+    for (let i = 0; i < numLabels; i++) {
+      const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/${i}/`;
       
-      // A CORREÇÃO PRINCIPAL ACONTECE AQUI:
-      // Removemos o 'Content-Type' para que o fetch envie como texto puro natural.
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 
-            'Accept': 'image/png'
-        },
-        body: label,
+        headers: { 'Accept': 'image/png' },
+        body: zpl, // Enviando todo o conteúdo cru
       });
       
-      if (!resp.ok) throw new Error(`Erro ${resp.status} na Labelary API`);
+      if (!resp.ok) continue; // Pula os comandos vazios
+      
       const blob = await resp.blob();
       const dataUrl = await blobToDataUrl(blob);
       previewImages.push(dataUrl);
     }
 
+    if (previewImages.length === 0) throw new Error("A API não gerou imagens. Verifique o código da etiqueta.");
+
     renderPreviews();
-    showStatus(`✓ ${previewImages.length} etiqueta${previewImages.length > 1 ? 's' : ''} gerada${previewImages.length > 1 ? 's' : ''} com sucesso!`);
+    showStatus(`✓ ${previewImages.length} etiqueta(s) gerada(s) com sucesso!`);
     btnPdf.disabled = false;
   } catch (err) {
-    showStatus('Erro: ' + err.message + '. Verifique sua conexão.', 'err');
+    showStatus('Erro: ' + err.message, 'err');
   } finally {
     btnRender.disabled = false;
   }
@@ -805,10 +773,9 @@ btnPdf.addEventListener('click', () => {
 
   const date = new Date().toISOString().slice(0, 10);
   pdf.save(`crissa-etiquetas-${date}.pdf`);
-  showStatus(`PDF com ${previewImages.length} página${previewImages.length > 1 ? 's' : ''} baixado!`);
+  showStatus(`PDF baixado!`);
 });
 
-// Download project as a guide
 document.getElementById('btn-download-project').addEventListener('click', () => {
   window.open('https://vercel.com/dashboard', '_blank');
 });
