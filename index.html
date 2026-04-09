@@ -650,7 +650,6 @@ function showStatus(msg, type = 'ok') {
   if (type === 'ok') setTimeout(() => statusArea.innerHTML = '', 5000);
 }
 
-// Lógica de contagem corrigida (não joga mais código fora)
 function updateCount() {
   const matches = zplInput.value.match(/\^XA/gi);
   const n = matches ? matches.length : 0;
@@ -683,7 +682,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   previewImages = [];
 });
 
-// Novo motor de renderização (Envia o arquivo inteiro de uma vez)
+// A MÁGICA ACONTECE AQUI:
 btnRender.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) { showStatus('Cole ou carregue um ZPL primeiro.', 'err'); return; }
@@ -691,7 +690,7 @@ btnRender.addEventListener('click', async () => {
   const numLabels = updateCount();
   if (numLabels === 0) { showStatus('Nenhum bloco ^XA encontrado.', 'err'); return; }
 
-  showStatus(`Processando ${numLabels} comando(s)...`, 'loading');
+  showStatus(`Processando arquivo com a Shopee...`, 'loading');
   btnRender.disabled = true;
 
   const paperSize = document.getElementById('paper-size').value;
@@ -704,13 +703,17 @@ btnRender.addEventListener('click', async () => {
     for (let i = 0; i < numLabels; i++) {
       const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/${i}/`;
       
+      // Empacotando o ZPL como um arquivo "invisível" para proteger o código da Shopee
+      const formData = new FormData();
+      formData.append('file', new Blob([zpl], { type: 'application/octet-stream' }), 'etiqueta.zpl');
+
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Accept': 'image/png' },
-        body: zpl, // Enviando todo o conteúdo cru
+        body: formData, // Enviamos o pacote protegido
       });
       
-      if (!resp.ok) continue; // Pula os comandos vazios
+      if (!resp.ok) continue; 
       
       const blob = await resp.blob();
       const dataUrl = await blobToDataUrl(blob);
