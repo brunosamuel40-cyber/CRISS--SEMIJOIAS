@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRISSÁ SEMIJÓIAS - Conversor ZPL → PDF</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --p50:  #f5f0ff;
@@ -623,6 +624,9 @@ Dica: cole múltiplas etiquetas de uma vez — cada ^XA...^XZ vira uma página n
 </div>
 
 <script>
+// Puxando a biblioteca para criar o PDF de volta
+const { jsPDF } = window.jspdf;
+
 const zplInput = document.getElementById('zpl-input');
 const previewWrap = document.getElementById('preview-wrap');
 const btnRender = document.getElementById('btn-render');
@@ -640,9 +644,24 @@ function showStatus(msg, type = 'ok') {
   if (type === 'ok') setTimeout(() => statusArea.innerHTML = '', 5000);
 }
 
+// O NOVO "FATIADOR INTELIGENTE": Separa um arquivo gigante em etiquetas minúsculas.
+function splitZPL(zplText) {
+  let text = zplText.trim();
+  let chunks = [];
+  
+  if (text.includes('~DG')) {
+    // Se for da Shopee, ele corta o texto mantendo o ~DG em cada fatia
+    chunks = text.split(/(?=~DG)/gi);
+  } else {
+    // Se for formato normal (Mercado Livre, etc), corta no ^XA
+    chunks = text.match(/\^XA[\s\S]*?\^XZ/gi) || [];
+  }
+  
+  return chunks.map(c => c.trim()).filter(c => c.length > 10);
+}
+
 function updateCount() {
-  const matches = zplInput.value.match(/\^XA/gi);
-  const n = matches ? matches.length : 0;
+  const n = splitZPL(zplInput.value).length;
   labelCount.textContent = n === 0 ? '0 etiquetas' : `${n} etiqueta${n > 1 ? 's' : ''} detectada${n > 1 ? 's' : ''}`;
   return n;
 }
@@ -672,15 +691,16 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   previewImages = [];
 });
 
-// MOTOR DE PRÉVIA: Só carrega as primeiras para não travar
+// MOTOR DE PRÉVIA: Só carrega as 3 primeiras fatias para ser ultra-rápido e não travar
 btnRender.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) { showStatus('Cole ou carregue um ZPL primeiro.', 'err'); return; }
 
-  const numLabels = updateCount();
-  if (numLabels === 0) { showStatus('Nenhum bloco ^XA encontrado.', 'err'); return; }
+  const chunks = splitZPL(zpl);
+  const numLabels = chunks.length;
+  if (numLabels === 0) { showStatus('Nenhum código válido encontrado.', 'err'); return; }
 
-  showStatus(`Gerando prévia inteligente...`, 'loading');
+  showStatus(`Gerando prévia...`, 'loading');
   btnRender.disabled = true;
 
   const paperSize = document.getElementById('paper-size').value;
@@ -688,16 +708,14 @@ btnRender.addEventListener('click', async () => {
   const dpi = document.getElementById('dpi').value;
 
   previewImages = [];
-  
-  // Limita a 3 imagens na prévia para não bloquear a API
   const maxPreviews = Math.min(numLabels, 3);
 
   try {
     for (let i = 0; i < maxPreviews; i++) {
-      const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/${i}/`;
+      const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/0/`;
       
       const formData = new FormData();
-      formData.append('file', new Blob([zpl], { type: 'application/octet-stream' }), 'etiqueta.zpl');
+      formData.append('file', new Blob([chunks[i]], { type: 'application/octet-stream' }), 'etiqueta.zpl');
 
       const resp = await fetch(url, {
         method: 'POST',
@@ -715,7 +733,7 @@ btnRender.addEventListener('click', async () => {
     if (previewImages.length === 0) throw new Error("Falha ao gerar imagens. Código inválido.");
 
     renderPreviews(numLabels);
-    showStatus(`✓ Prévia pronta! Clique em Baixar PDF para pegar o arquivo completo.`);
+    showStatus(`✓ Prévia pronta! Clique em Baixar PDF para o arquivo completo.`);
     btnPdf.disabled = false;
   } catch (err) {
     showStatus('Erro: ' + err.message, 'err');
@@ -724,48 +742,60 @@ btnRender.addEventListener('click', async () => {
   }
 });
 
-// MOTOR DE PDF: Pede o PDF oficial completo da Labelary de uma vez só
+// MOTOR DE DOWNLOAD: Processa as 52 fatias com sistema Anti-Bloqueio (pausa de 300ms)
 btnPdf.addEventListener('click', async () => {
   const zpl = zplInput.value.trim();
   if (!zpl) return;
 
-  const numLabels = updateCount();
-  showStatus(`Gerando PDF final com ${numLabels} página(s)...`, 'loading');
+  const chunks = splitZPL(zpl);
+  const total = chunks.length;
+  
   btnPdf.disabled = true;
 
   const paperSize = document.getElementById('paper-size').value;
   const [wInch, hInch] = paperSize.split('x').map(Number);
+  const wMM = wInch * 25.4;
+  const hMM = hInch * 25.4;
   const dpi = document.getElementById('dpi').value;
 
+  const pdf = new jsPDF({ unit: 'mm', format: [wMM, hMM], orientation: 'p' });
+
   try {
-    // Ao NÃO colocar o número da página no final da URL, a API entende que queremos TODAS juntas!
-    const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/`;
+    let successCount = 0;
     
-    const formData = new FormData();
-    formData.append('file', new Blob([zpl], { type: 'application/octet-stream' }), 'etiquetas.zpl');
+    for (let i = 0; i < total; i++) {
+      showStatus(`Processando página ${i + 1} de ${total}... (Isso pode levar um tempinho)`, 'loading');
+      
+      const url = `https://api.labelary.com/v1/printers/${dpi}dpmm/labels/${wInch}x${hInch}/0/`;
+      
+      const formData = new FormData();
+      formData.append('file', new Blob([chunks[i]], { type: 'application/octet-stream' }), `etiqueta_${i}.zpl`);
 
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Accept': 'application/pdf' }, // Isso muda tudo, ele gera o PDF nativo
-      body: formData,
-    });
-    
-    if (!resp.ok) throw new Error("A API não conseguiu gerar o PDF.");
-    
-    const blob = await resp.blob();
-    
-    // Força o download do PDF
-    const urlDownload = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = urlDownload;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'image/png' },
+        body: formData,
+      });
+      
+      if (!resp.ok) continue; 
+      
+      const blob = await resp.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      
+      // Adiciona a página no PDF
+      if (successCount > 0) pdf.addPage([wMM, hMM], 'p');
+      pdf.addImage(dataUrl, 'PNG', 0, 0, wMM, hMM, '', 'FAST');
+      successCount++;
+      
+      // SISTEMA ANTI-BLOQUEIO: Pausa de 300ms para a Labelary não fechar nossa conexão
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    if(successCount === 0) throw new Error("Nenhuma etiqueta pôde ser processada.");
+
     const date = new Date().toISOString().slice(0, 10);
-    a.download = `crissa-etiquetas-${date}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(urlDownload);
-
-    showStatus(`✓ PDF completo baixado com sucesso!`);
+    pdf.save(`crissa-etiquetas-${date}.pdf`);
+    showStatus(`✓ PDF com ${successCount} páginas baixado com sucesso!`);
   } catch (err) {
     showStatus('Erro: ' + err.message, 'err');
   } finally {
@@ -800,7 +830,6 @@ function renderPreviews(totalLabels) {
     previewWrap.appendChild(card);
   });
 
-  // Mostra um aviso simpático se houver mais etiquetas escondidas
   if (totalLabels > previewImages.length) {
      const info = document.createElement('div');
      info.style.width = "100%";
