@@ -1,0 +1,14 @@
+{
+  "name": "crissa-zpl-converter",
+  "version": "1.0.0",
+  "description": "Conversor ZPL para PDF - Crissá Dorama & Semijoias",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/convert.js"
+  },
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "pdfkit": "^0.15.0",
+    "zpl-image": "^1.3.0"
+  }
+}
